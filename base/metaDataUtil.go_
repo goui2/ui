@@ -1,0 +1,106 @@
+package base
+
+import (
+	"log"
+	"reflect"
+)
+
+var (
+	MDMerge MetaDataMerge = &metaDataMerge{make(map[string]MetaDataSettingCompose)}
+)
+
+func initMDMerge() bool {
+	log.Println("init()")
+	MDMerge.Register("MDSettingCallback",
+		func(s, t MetaDataSetting) MetaDataSetting {
+			cs := s.(MDSettingCallback)
+			ct := t.(MDSettingCallback)
+			return MDSettingCallback(
+				func(m MetaData) MetaData {
+					r1 := cs(m)
+					r2 := ct(r1)
+					return r2
+				})
+		})
+	return true
+}
+
+type MetaDataSettingCompose func(s, t MetaDataSetting) MetaDataSetting
+
+type MetaDataSettingsSelection func([]MetaDataSetting, func(MetaDataSetting) MetaDataSetting) []MetaDataSetting
+
+func (f MetaDataSettingsSelection) Select(mds []MetaDataSetting, selector func(MetaDataSetting) MetaDataSetting) []MetaDataSetting {
+	return f(mds, selector)
+}
+
+type MetaDataMerge interface {
+	With(defaultSettings ...MetaDataSetting) MetaDataSettingsSelection
+	Register(mds string, c MetaDataSettingCompose)
+}
+
+type metaDataMerge struct {
+	compFunctions map[string]MetaDataSettingCompose
+}
+
+func (m *metaDataMerge) Register(s string, c MetaDataSettingCompose) {
+	log.Println(s)
+	m.compFunctions[s] = c
+}
+
+func (m metaDataMerge) typeName(ms MetaDataSetting) string { return reflect.TypeOf(ms).Name() }
+
+func (m *metaDataMerge) With(defaultSettings ...MetaDataSetting) MetaDataSettingsSelection {
+
+	selection := func(mds []MetaDataSetting, selector func(MetaDataSetting) MetaDataSetting) []MetaDataSetting {
+		typeName := m.typeName
+		types := make(map[string]bool)
+		result := make([]MetaDataSetting, 0, len(mds)+1)
+		combMDS := make(map[string]MetaDataSetting)
+
+		for _, i := range defaultSettings {
+			switch i.Type() {
+			case Combine:
+				combMDS[typeName(i)] = i
+			}
+		}
+
+		ctrl := func(mi MetaDataSetting) {
+			if ni := selector(mi); ni != nil {
+				result = append(result, ni)
+				types[reflect.TypeOf(mi).Name()] = true
+			}
+		}
+		for _, i := range mds {
+			switch i.Type() {
+			case Combine:
+				if s, ok := combMDS[typeName(i)]; ok {
+					if compose, ok := m.compFunctions[typeName(i)]; ok {
+						combMDS[typeName(i)] = compose(s, i)
+					} else {
+						panic("missing compose function for " + typeName(i))
+					}
+				} else {
+					ctrl(i)
+				}
+			default:
+				ctrl(i)
+			}
+		}
+		for _, i := range defaultSettings {
+			switch i.Type() {
+			case Required:
+				result = append(result, i)
+			case Overwrite:
+				if _, ok := types[typeName(i)]; !ok {
+					result = append(result, i)
+				}
+			}
+		}
+		for _, i := range combMDS {
+			result = append(result, i)
+		}
+		return result
+	}
+
+	return MetaDataSettingsSelection(selection)
+}
