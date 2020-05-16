@@ -5,11 +5,11 @@ go 1.14
 replace github.com/goui2/ui/m => ../../m
 
 require (
-	github.com/goui2/ui/base v0.0.0-00010101000000-000000000000
-	github.com/goui2/ui/com v0.0.0-00010101000000-000000000000
-	github.com/goui2/ui/m v0.0.0-00010101000000-000000000000
-	github.com/goui2/ui/model v0.0.0-00010101000000-000000000000
-	github.com/goui2/ui/core v0.0.0-00010101000000-000000000000
+	github.com/goui2/ui/base v0.0.0
+	github.com/goui2/ui/com v0.0.0
+	github.com/goui2/ui/m v0.0.0
+	github.com/goui2/ui/model v0.0.0
+	github.com/goui2/ui/core v0.0.0
 )
 
 replace github.com/goui2/ui/base => ../../base
